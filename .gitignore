@@ -1,0 +1,16 @@
+
+# Private login details
+Login Credentials.txt
+
+# Generated QR codes
+qrcodes/*.png
+
+# QR library temporary files
+libs/phpqrcode/cache/
+
+# VS Code settings
+.vscode/
+
+# Temporary files
+*.log
+*.tmp

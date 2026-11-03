@@ -1,0 +1,29 @@
+📁 event-pro/
+│
+├── 📁 assets/               (Visuals, CSS, and JS)
+|   └── html-qrcode.js
+├── 📁 config/               (Database connection)
+│   └── db.php               
+├── 📁 libs/                 (Third-party)
+|    └── 📁phpqrcode   
+├── 📁 qrcodes/              (Saved user QR images)
+│
+├── 📁 pages/                (All your web pages)
+│   │
+│   ├── 📁 admin/            (Strictly Admin Access)
+│   │   ├── admin.php
+│   │   ├── create_event.php
+│   │   ├── print_report.php
+│   │   ├── scanner.php
+│   │   └── verify_qr.php
+│   │
+│   ├── 📁 user/             (Strictly User Access)
+│   │   ├── user_dashboard.php
+│   │   └── generate_qr.php  
+│   │
+│   └── 📁 auth/             (Authentication / Logging in)
+│       ├── login.php
+│       ├── register.php
+│       └── logout.php      
+│
+└── home.php           
