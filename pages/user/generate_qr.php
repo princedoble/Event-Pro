@@ -1,405 +1,640 @@
+
 <?php
-// 1. START SESSION & INCLUDES
 session_start();
+require_once '../../config/db.php';
+require_once '../../config/security.php';
+require_once '../../libs/phpqrcode/qrlib.php';
 
-// ROUTING FIX 1: Step back twice to reach the config folder
-include '../../config/db.php'; 
-
-// ROUTING FIX 2: Step back twice to reach the libs folder
-include '../../libs/phpqrcode/qrlib.php'; 
-
-// 2. SECURITY CHECK
-if(!isset($_SESSION['username'])) { 
-    // ROUTING FIX 3: Point to the login page inside the auth folder
-    header("Location: ../auth/login.php"); 
-    exit(); 
+if (
+    empty($_SESSION['username']) ||
+    ($_SESSION['role'] ?? '') !== 'user'
+) {
+    header('Location: ../auth/login.php');
+    exit;
 }
 
-// 3. AUTO-PATCH: DATABASE UPGRADE
-$check_col = mysqli_query($conn, "SHOW COLUMNS FROM participants LIKE 'account_username'");
-if(mysqli_num_rows($check_col) == 0) {
-    mysqli_query($conn, "ALTER TABLE participants ADD COLUMN account_username VARCHAR(100) DEFAULT ''");
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
+function reg_h($value): string {
+    return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 }
 
-$show_results = false; 
-$error = ""; 
-
-$logged_user = $_SESSION['username'];
-
-// 4. FETCH USER'S REGISTERED EMAIL
-$email_query = mysqli_query($conn, "SELECT registration_email FROM registration WHERE username = '$logged_user'");
-$email_data = mysqli_fetch_assoc($email_query);
-
-$user_email = "";
-if (isset($email_data['registration_email'])) {
-    $user_email = $email_data['registration_email'];
+function normalize_name(string $name): string {
+    return trim(preg_replace('/\s+/u', ' ', $name) ?? $name);
 }
 
-// 5. GET THE EVENT ID FROM THE URL
-$target_event_id = 0;
-if (isset($_GET['event_id'])) {
-    $target_event_id = intval($_GET['event_id']); 
-}
+$username = (string)$_SESSION['username'];
+$eventId = filter_var(
+    $_GET['event_id'] ?? null,
+    FILTER_VALIDATE_INT
+) ?: 0;
 
-$event_name_display = "Unknown Event";
+$error = '';
+$success = '';
+$qrImage = '';
+$event = null;
+$existing = null;
+$userEmail = '';
+$fullName = '';
 
-// 6. FETCH EVENT DETAILS
-if ($target_event_id > 0) {
-    $evt_query = mysqli_query($conn, "SELECT event_name FROM events WHERE event_id = '$target_event_id'");
-    
-    if ($evt_row = mysqli_fetch_assoc($evt_query)) {
-        $event_name_display = $evt_row['event_name'];
-    } else {
-        $error = "Invalid seminar selected. Please return to the dashboard.";
-    }
-} else {
-    $error = "No seminar selected! Please go back to the dashboard and choose a seminar.";
-}
+try {
+    $stmt = $conn->prepare(
+        "SELECT registration_email
+         FROM registration
+         WHERE username = ?
+           AND role = 'user'
+           AND status = 'active'
+         LIMIT 1"
+    );
+    $stmt->bind_param('s', $username);
+    $stmt->execute();
+    $account = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
 
-// ==========================================
-// 7. MAIN REGISTRATION LOGIC
-// ==========================================
-if (isset($_POST['register'])) {
-    
-    $name = mysqli_real_escape_string($conn, $_POST['real_name']); 
-    $email = mysqli_real_escape_string($conn, $_POST['email']);
-    $event_id = intval($_POST['event_id']); 
-    
-    // A. CAPACITY CHECK
-    $event_check = mysqli_query($conn, "SELECT max_capacity FROM events WHERE event_id = '$event_id'");
-    $event_data = mysqli_fetch_assoc($event_check);
-    
-    $max = 0; 
-    if (isset($event_data['max_capacity'])) {
-        $max = intval($event_data['max_capacity']);
+    if (!$account) {
+        http_response_code(403);
+        exit('Account is not active.');
     }
 
-    $count_res = mysqli_query($conn, "SELECT COUNT(*) as total FROM participants WHERE event_id = '$event_id'");
-    $count_data = mysqli_fetch_assoc($count_res);
-    
-    if ($count_data['total'] >= $max) {
-        $error = "Sorry, this seminar is fully booked!";
-    } else {
-        
-        // B. DUPLICATE CHECK
-        $check = mysqli_query($conn, "SELECT * FROM participants WHERE account_username = '$logged_user' AND event_id = '$event_id'");
+    $userEmail = (string)$account['registration_email'];
 
-        if (mysqli_num_rows($check) > 0) {
-            $error = "You are already registered for this event!";
-        } else {
-            
-            // C. GENERATE THE QR CODE IMAGE
-            // ROUTING FIX 4: Step back twice to save the images in the root qrcodes folder
-            $path = '../../qrcodes/'; 
-            
-            if (!file_exists($path)) {
-                mkdir($path, 0777, true);
-            }
+    if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
+        throw new RuntimeException(
+            'Your account does not have a valid email.'
+        );
+    }
 
-            $fileName = $path . 'user_' . time() . '.png';
-            $qrContent = "Event_ID: " . $event_id . "\nName: " . $name . "\nEmail: " . $email;
-            
-            QRcode::png($qrContent, $fileName, QR_ECLEVEL_L, 4, 2);
+    if ($eventId < 1) {
+        throw new RuntimeException('Select a valid seminar.');
+    }
 
-            // ROUTING FIX 5: Save a clean path to the database (removes the ../../)
-            $db_path = str_replace("../../", "", $fileName);
+    $stmt = $conn->prepare(
+        "SELECT event_id, event_name, event_date,
+                event_status, max_capacity
+         FROM events
+         WHERE event_id = ?
+         LIMIT 1"
+    );
+    $stmt->bind_param('i', $eventId);
+    $stmt->execute();
+    $event = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
 
-            // D. SAVE TO THE DATABASE
-            mysqli_query($conn, "INSERT INTO participants 
-                (participant_name, participant_email, event_id, participant_qr, participant_status, account_username) 
-                VALUES ('$name', '$email', '$event_id', '$db_path', 'Pending', '$logged_user')");
+    if (!$event) {
+        throw new RuntimeException('Seminar not found.');
+    }
 
-            // E. SHOW SUCCESS SCREEN
-            $show_results = true;
-            $qrImage = $fileName;
+    $stmt = $conn->prepare(
+        "SELECT participant_id, participant_name,
+                participant_status, participant_qr,
+                qr_token
+         FROM participants
+         WHERE event_id = ?
+           AND (
+               account_username = ?
+               OR participant_email = ?
+           )
+         LIMIT 1"
+    );
+    $stmt->bind_param(
+        'iss',
+        $eventId,
+        $username,
+        $userEmail
+    );
+    $stmt->execute();
+    $existing = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if ($existing) {
+        $fullName = (string)$existing['participant_name'];
+
+        $savedPath = (string)$existing['participant_qr'];
+
+        if (
+            $existing['participant_status'] === 'Pending' &&
+            preg_match(
+                '~^qrcodes/[a-zA-Z0-9_-]+\.png$~D',
+                $savedPath
+            ) &&
+            !empty($existing['qr_token']) &&
+            is_file('../../' . $savedPath)
+        ) {
+            $qrImage = '../../' . $savedPath;
+            $success = 'Your existing QR ticket is ready.';
         }
     }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        require_csrf();
+
+        $fullName = normalize_name(
+            (string)($_POST['real_name'] ?? '')
+        );
+
+        if (
+            $fullName === '' ||
+            strlen($fullName) > 255 ||
+            preg_match('/[\x00-\x1F\x7F]/', $fullName)
+        ) {
+            throw new RuntimeException(
+                'Enter a valid full name.'
+            );
+        }
+
+        $newFile = '';
+        $conn->begin_transaction();
+
+        try {
+            // Lock the seminar to serialize registrations.
+            $stmt = $conn->prepare(
+                "SELECT event_id, event_date,
+                        event_status, max_capacity
+                 FROM events
+                 WHERE event_id = ?
+                 FOR UPDATE"
+            );
+            $stmt->bind_param('i', $eventId);
+            $stmt->execute();
+            $lockedEvent = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+
+            if (
+                !$lockedEvent ||
+                $lockedEvent['event_status'] !== 'Active' ||
+                $lockedEvent['event_date'] < date('Y-m-d')
+            ) {
+                throw new RuntimeException(
+                    'Registration for this seminar is closed.'
+                );
+            }
+
+            // Recheck the logged-in account inside the lock.
+            $stmt = $conn->prepare(
+                "SELECT participant_id, participant_name,
+                        participant_status, participant_qr,
+                        qr_token
+                 FROM participants
+                 WHERE event_id = ?
+                   AND (
+                       account_username = ?
+                       OR participant_email = ?
+                   )
+                 LIMIT 1
+                 FOR UPDATE"
+            );
+            $stmt->bind_param(
+                'iss',
+                $eventId,
+                $username,
+                $userEmail
+            );
+            $stmt->execute();
+            $registered = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+
+            if (
+                $registered &&
+                $registered['participant_status'] !== 'Pending'
+            ) {
+                throw new RuntimeException(
+                    'Your registration has already been '
+                    . 'processed for attendance.'
+                );
+            }
+
+            if (!$registered) {
+                /*
+                 * NEW SECURITY CHECK
+                 *
+                 * Compare names inside the same event.
+                 * Ignore letter case and repeated spaces.
+                 *
+                 * MariaDB 10.4 / MySQL 8:
+                 * REGEXP_REPLACE is supported.
+                 */
+                $stmt = $conn->prepare(
+                    "SELECT participant_id
+                     FROM participants
+                     WHERE event_id = ?
+                       AND LOWER(
+                           TRIM(
+                               REGEXP_REPLACE(
+                                   participant_name,
+                                   '[[:space:]]+',
+                                   ' '
+                               )
+                           )
+                       ) = LOWER(?)
+                     LIMIT 1"
+                );
+                $stmt->bind_param(
+                    'is',
+                    $eventId,
+                    $fullName
+                );
+                $stmt->execute();
+                $sameName = $stmt->get_result()->fetch_assoc();
+                $stmt->close();
+
+                if ($sameName) {
+                    throw new RuntimeException(
+                        'This full name is already registered '
+                        . 'for this seminar. If this is another '
+                        . 'person with the same name, please '
+                        . 'contact the administrator.'
+                    );
+                }
+
+                // Capacity check.
+                $stmt = $conn->prepare(
+                    "SELECT COUNT(*) AS total
+                     FROM participants
+                     WHERE event_id = ?"
+                );
+                $stmt->bind_param('i', $eventId);
+                $stmt->execute();
+                $count = $stmt->get_result()->fetch_assoc();
+                $stmt->close();
+
+                if (
+                    (int)$count['total'] >=
+                    (int)$lockedEvent['max_capacity']
+                ) {
+                    throw new RuntimeException(
+                        'Sorry, this seminar is fully booked.'
+                    );
+                }
+            }
+
+            // If a secure ticket already exists, reuse it.
+            $reuse = false;
+
+            if ($registered) {
+                $oldPath = (string)$registered['participant_qr'];
+
+                if (
+                    preg_match(
+                        '/^[a-f0-9]{64}$/D',
+                        (string)$registered['qr_token']
+                    ) &&
+                    preg_match(
+                        '~^qrcodes/[a-zA-Z0-9_-]+\.png$~D',
+                        $oldPath
+                    ) &&
+                    is_file('../../' . $oldPath)
+                ) {
+                    $reuse = true;
+                    $qrImage = '../../' . $oldPath;
+                }
+            }
+
+            if (!$reuse) {
+                $token = bin2hex(random_bytes(32));
+                $fileId = bin2hex(random_bytes(16));
+
+                $directory = '../../qrcodes/';
+
+                if (
+                    !is_dir($directory) &&
+                    !mkdir($directory, 0755, true) &&
+                    !is_dir($directory)
+                ) {
+                    throw new RuntimeException(
+                        'Unable to create the QR folder.'
+                    );
+                }
+
+                $filename = 'ticket_' . $fileId . '.png';
+                $newFile = $directory . $filename;
+                $dbPath = 'qrcodes/' . $filename;
+
+                QRcode::png(
+                    'EVENTPRO:' . $token,
+                    $newFile,
+                    QR_ECLEVEL_M,
+                    5,
+                    2
+                );
+
+                if (!is_file($newFile)) {
+                    throw new RuntimeException(
+                        'Unable to create QR image.'
+                    );
+                }
+
+                if ($registered) {
+                    // Reissue an older Pending ticket.
+                    $participantId = (int)$registered['participant_id'];
+
+                    $stmt = $conn->prepare(
+                        "UPDATE participants
+                         SET qr_token = ?,
+                             participant_qr = ?
+                         WHERE participant_id = ?
+                           AND participant_status = 'Pending'"
+                    );
+                    $stmt->bind_param(
+                        'ssi',
+                        $token,
+                        $dbPath,
+                        $participantId
+                    );
+                } else {
+                    // New registration.
+                    $stmt = $conn->prepare(
+                        "INSERT INTO participants
+                         (
+                             participant_name,
+                             participant_email,
+                             event_id,
+                             participant_qr,
+                             participant_status,
+                             account_username,
+                             qr_token
+                         )
+                         VALUES (?, ?, ?, ?, 'Pending', ?, ?)"
+                    );
+                    $stmt->bind_param(
+                        'ssisss',
+                        $fullName,
+                        $userEmail,
+                        $eventId,
+                        $dbPath,
+                        $username,
+                        $token
+                    );
+                }
+
+                $stmt->execute();
+                $stmt->close();
+
+                $qrImage = $newFile;
+            }
+
+            $conn->commit();
+
+            $success = $registered
+                ? 'Your secure QR ticket is ready.'
+                : 'Registration successful!';
+
+        } catch (Throwable $exception) {
+            $conn->rollback();
+
+            if ($newFile !== '' && is_file($newFile)) {
+                unlink($newFile);
+            }
+
+            throw $exception;
+        }
+    }
+
+} catch (Throwable $exception) {
+    error_log(
+        'Event-Pro registration error: ' .
+        $exception->getMessage()
+    );
+
+    if (
+        $exception instanceof RuntimeException
+    ) {
+        $error = $exception->getMessage();
+    } elseif (
+        $exception instanceof mysqli_sql_exception &&
+        $exception->getCode() === 1062
+    ) {
+        $error = 'A registration already exists '
+               . 'for this account or email.';
+    } else {
+        $error = 'Unable to complete registration. '
+               . 'Please try again.';
+    }
+
+    $qrImage = '';
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Event Registration | Event-Pro</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Event Registration | Event-Pro</title>
 <style>
-        :root {
-            --bg-color: #000000;
-            --text-main: #f5f5f7;
-            --text-muted: #86868b;
-            --accent-color: #f8f32b;
-            --accent-text: #000000;
-            --danger-color: #ff453a;
-        }
-
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            background: var(--bg-color); 
-            margin: 0; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            min-height: 100vh; 
-            color: var(--text-main); 
-            overflow: hidden; 
-            position: relative; 
-        }
-
-        .orb { 
-            position: absolute; 
-            border-radius: 50%; 
-            filter: blur(80px); 
-            opacity: 0.5; 
-            animation: float 10s infinite ease-in-out alternate; 
-            z-index: 0; 
-        }
-        
-        .orb-1 { 
-            width: 350px; 
-            height: 350px; 
-            background: #8d99ae; 
-            top: 10%; 
-            right: 20%; 
-            animation-delay: 0s; 
-        }
-        
-        .orb-2 { 
-            width: 300px; 
-            height: 300px; 
-            background: #f8f32b; 
-            bottom: 10%; 
-            left: 15%; 
-            animation-delay: -3s; 
-        }
-
-        @keyframes float { 
-            0% { transform: translate(0, 0) scale(1); } 
-            100% { transform: translate(-30px, 40px) scale(1.1); } 
-        }
-
-        .container { 
-            background: rgba(30, 30, 32, 0.6); 
-            backdrop-filter: blur(25px); 
-            -webkit-backdrop-filter: blur(25px); 
-            padding: 40px; 
-            border-radius: 20px; 
-            box-shadow: 0 25px 50px rgba(0,0,0,0.5); 
-            border: 1px solid rgba(255, 255, 255, 0.1); 
-            width: 100%; 
-            max-width: 420px; 
-            text-align: center; 
-            z-index: 1; 
-        }
-
-        h2 { 
-            color: var(--text-main); 
-            margin-top: 0; 
-            margin-bottom: 5px; 
-            font-weight: 600; 
-            font-size: 24px; 
-        }
-        
-        .welcome-text { 
-            color: var(--text-muted); 
-            font-size: 14px; 
-            margin-top: 0; 
-            margin-bottom: 25px; 
-        }
-        
-        .reg-form { 
-            display: <?php 
-                if ($show_results == true) { 
-                    echo 'none'; 
-                } else { 
-                    echo 'block'; 
-                } 
-            ?>; 
-        }
-        
-        .input-group { 
-            text-align: left; 
-            margin-bottom: 15px; 
-        }
-        
-        .input-label { 
-            display: block; 
-            color: var(--text-muted); 
-            font-size: 13px; 
-            margin-bottom: 6px; 
-            margin-left: 4px; 
-            font-weight: 500; 
-        }
-        
-        input { 
-            display: block; 
-            padding: 14px 16px; 
-            width: 100%; 
-            border-radius: 12px; 
-            border: 1px solid rgba(255,255,255,0.1); 
-            background: rgba(0,0,0,0.4); 
-            box-sizing: border-box; 
-            font-size: 15px; 
-            color: var(--text-main); 
-            transition: all 0.3s ease; 
-            outline: none; 
-        }
-        
-        input:focus { 
-            border-color: var(--accent-color); 
-            background: rgba(0,0,0,0.6); 
-            box-shadow: 0 0 0 4px rgba(248, 243, 43, 0.1); 
-        }
-        
-        input[readonly] { 
-            color: var(--accent-color); 
-            font-weight: 600; 
-            background: rgba(0, 0, 0, 0.2); 
-            border-color: rgba(248, 243, 43, 0.3); 
-            cursor: default; 
-        }
-        
-        input[readonly]:focus { 
-            box-shadow: none; 
-            border-color: rgba(248, 243, 43, 0.3); 
-        }
-
-        .btn-generate { 
-            width: 100%; 
-            padding: 14px; 
-            background: var(--accent-color); 
-            color: var(--accent-text); 
-            border: none; 
-            cursor: pointer; 
-            border-radius: 12px; 
-            font-weight: 600; 
-            font-size: 15px; 
-            transition: transform 0.2s, opacity 0.2s; 
-            margin-top: 10px; 
-        }
-        
-        .btn-generate:hover:not(:disabled) { 
-            opacity: 0.9; 
-            transform: scale(0.98); 
-        }
-        
-        .btn-generate:disabled { 
-            background: var(--text-muted); 
-            cursor: not-allowed; 
-        }
-
-        .error-msg { 
-            background: rgba(255, 69, 58, 0.1); 
-            color: var(--danger-color); 
-            padding: 12px; 
-            border-radius: 8px; 
-            margin-bottom: 20px; 
-            font-size: 14px; 
-            border: 1px solid rgba(255, 69, 58, 0.3); 
-            font-weight: 500; 
-        }
-
-        .result-card { 
-            margin-top: 10px; 
-            padding: 24px; 
-            border-radius: 16px; 
-            background: rgba(0,0,0,0.4); 
-            border: 1px solid rgba(255,255,255,0.05); 
-        }
-        
-        .result-card img { 
-            border: 4px solid var(--accent-color); 
-            margin: 15px 0; 
-            border-radius: 12px; 
-            max-width: 180px; 
-            background: white; 
-            padding: 10px; 
-        }
-
-        .btn-group { 
-            display: flex; 
-            gap: 15px; 
-            justify-content: center; 
-            margin-top: 15px; 
-        }
-        
-        .action-link { 
-            text-decoration: none; 
-            color: var(--accent-color); 
-            font-weight: 600; 
-            font-size: 15px; 
-        }
-        
-        .action-link:hover { 
-            text-decoration: underline; 
-        }
-
-        .userdashboard-link { 
-            display: inline-block; 
-            margin-top: 25px; 
-            color: var(--text-muted); 
-            text-decoration: none; 
-            font-size: 14px; 
-            transition: color 0.2s; 
-        }
-        
-        .userdashboard-link:hover { 
-            color: var(--accent-color); 
-        }
-    </style>
+    :root {
+        --bg: #000;
+        --card: rgba(30,30,32,.85);
+        --accent: #f8f32b;
+        --muted: #a1a1a6;
+        --danger: #ff453a;
+        --success: #32d74b;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        min-height: 100vh;
+        padding: 25px 15px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: var(--bg);
+        color: #f5f5f7;
+        font-family: -apple-system, BlinkMacSystemFont,
+                     "Segoe UI", Arial, sans-serif;
+    }
+    .container {
+        width: 100%;
+        max-width: 450px;
+        padding: 36px;
+        background: var(--card);
+        border: 1px solid rgba(255,255,255,.1);
+        border-radius: 22px;
+        text-align: center;
+        box-shadow: 0 24px 55px rgba(0,0,0,.5);
+    }
+    h2 { margin: 0 0 12px; font-size: 27px; }
+    .subtitle {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+        margin-bottom: 28px;
+    }
+    .field { text-align: left; margin-bottom: 20px; }
+    label {
+        display: block;
+        color: var(--muted);
+        font-size: 13px;
+        margin-bottom: 8px;
+    }
+    input {
+        width: 100%;
+        padding: 15px;
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,.15);
+        background: #101010;
+        color: white;
+        font-size: 15px;
+    }
+    input[readonly] { color: var(--accent); }
+    input:focus {
+        outline: none;
+        border-color: var(--accent);
+    }
+    button, .action {
+        display: inline-block;
+        width: 100%;
+        background: var(--accent);
+        color: black;
+        padding: 15px;
+        border: 0;
+        border-radius: 12px;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+    }
+    button:hover, .action:hover { opacity: .9; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .alert {
+        padding: 14px;
+        border-radius: 12px;
+        margin: 18px 0;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+    .error {
+        color: var(--danger);
+        background: rgba(255,69,58,.1);
+        border: 1px solid rgba(255,69,58,.4);
+    }
+    .success {
+        color: var(--success);
+        background: rgba(50,215,75,.1);
+        border: 1px solid rgba(50,215,75,.4);
+    }
+    .qr {
+        display: block;
+        width: 225px;
+        max-width: 100%;
+        margin: 22px auto;
+        padding: 12px;
+        background: white;
+        border-radius: 12px;
+    }
+    .back {
+        display: block;
+        color: var(--muted);
+        text-decoration: none;
+        margin-top: 30px;
+        font-size: 14px;
+    }
+    .back:hover { color: var(--accent); }
+</style>
 </head>
 <body>
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
+<main class="container">
+    <h2>Event Registration</h2>
+    <p class="subtitle">
+        Confirm your details to receive your
+        secure Event-Pro QR attendance pass.
+    </p>
 
-    <div class="container">
-        <h2>Complete Registration</h2>
-        <p class="welcome-text">Confirm your details below to generate your pass.</p>
-        
-        <?php if ($error): ?>
-            <div class="error-msg"><?php echo $error; ?></div>
-        <?php endif; ?>
+    <?php if ($error !== ''): ?>
+        <div class="alert error"><?= reg_h($error) ?></div>
+    <?php endif; ?>
 
-        <div class="reg-form">
-            <form method="POST">
-                
-                <div class="input-group">
-                    <label class="input-label">Seminar Selected:</label>
-                    <input type="text" value="<?php echo htmlspecialchars($event_name_display); ?>" readonly>
-                    <input type="hidden" name="event_id" value="<?php echo $target_event_id; ?>">
+    <?php if ($success !== ''): ?>
+        <div class="alert success"><?= reg_h($success) ?></div>
+    <?php endif; ?>
+
+    <?php if ($qrImage !== ''): ?>
+        <h3>Your QR Attendance Pass</h3>
+        <p class="subtitle">
+            <?= reg_h($event['event_name'] ?? '') ?>
+        </p>
+
+        <img
+            class="qr"
+            src="<?= reg_h($qrImage) ?>"
+            alt="Your seminar QR ticket"
+        >
+
+        <a
+            class="action"
+            href="<?= reg_h($qrImage) ?>"
+            download
+        >
+            Download QR Code
+        </a>
+
+    <?php elseif ($event && $userEmail !== ''): ?>
+
+        <?php if (
+            $existing &&
+            $existing['participant_status'] !== 'Pending'
+        ): ?>
+            <div class="alert success">
+                Your attendance status is
+                <?= reg_h($existing['participant_status']) ?>.
+            </div>
+        <?php else: ?>
+
+            <form
+                method="POST"
+                action="generate_qr.php?event_id=<?= $eventId ?>"
+            >
+                <?= csrf_field() ?>
+
+                <div class="field">
+                    <label>Selected Seminar</label>
+                    <input
+                        value="<?= reg_h($event['event_name']) ?>"
+                        readonly
+                    >
                 </div>
-                
-                <div class="input-group">
-                    <label class="input-label">Full Name (For Certificate/Admin):</label>
-                    <input type="text" name="real_name" placeholder="Enter your full real name" required>
+
+                <div class="field">
+                    <label for="real_name">Full Name</label>
+                    <input
+                        type="text"
+                        id="real_name"
+                        name="real_name"
+                        maxlength="255"
+                        value="<?= reg_h($fullName) ?>"
+                        placeholder="Enter your full name"
+                        required
+                    >
                 </div>
 
-                <div class="input-group">
-                    <label class="input-label">Registered Email (Locked):</label>
-                    <input type="email" name="email" value="<?php echo htmlspecialchars($user_email); ?>" readonly>
+                <div class="field">
+                    <label>Registered Email</label>
+                    <input
+                        value="<?= reg_h($userEmail) ?>"
+                        readonly
+                    >
                 </div>
 
-                <button type="submit" name="register" class="btn-generate" 
-                    <?php 
-                        if ($target_event_id == 0) { 
-                            echo 'disabled'; 
-                        } 
-                    ?>>
-                    Confirm & Get QR Code
+                <button
+                    type="submit"
+                    name="register"
+                    value="1"
+                    <?php if (
+                        $event['event_status'] !== 'Active' ||
+                        $event['event_date'] < date('Y-m-d')
+                    ): ?>
+                        disabled
+                    <?php endif; ?>
+                >
+                    <?= $existing
+                        ? 'Generate Secure QR Pass'
+                        : 'Confirm & Get QR Code' ?>
                 </button>
             </form>
-        </div>
 
-        <?php if ($show_results): ?>
-            <div class="result-card">
-                <h3 style="color: var(--accent-color); margin-top: 0; font-weight: 600;">Success!</h3>
-                <img src="<?php echo htmlspecialchars($qrImage); ?>" alt="Your QR Code"><br>
-                <div class="btn-group">
-                    <a href="<?php echo htmlspecialchars($qrImage); ?>" download class="action-link">💾 Download QR Pass</a>
-                </div>
-            </div>
         <?php endif; ?>
-        
-        <a href="user_dashboard.php" class="userdashboard-link">← Back to Dashboard</a>
-    </div>
+    <?php endif; ?>
+
+    <a href="user_dashboard.php?tab=upcoming" class="back">
+        ← Back to My Registrations
+    </a>
+</main>
 </body>
 </html>
