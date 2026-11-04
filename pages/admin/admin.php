@@ -1629,6 +1629,670 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         openTab(null, selected);
     });
+    (function () {
+    const mobileCSS = `
+        /* Mobile navigation button */
+
+        .admin-mobile-toggle {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+
+            html {
+                width: 100%;
+                overflow-x: hidden;
+            }
+
+            body {
+                display: block;
+                width: 100%;
+                min-height: 100vh;
+                min-height: 100dvh;
+                height: auto;
+                overflow-x: hidden;
+                overflow-y: auto;
+            }
+
+            /* Compact admin header */
+
+            .sidebar {
+                position: sticky;
+                top: 0;
+                left: 0;
+                z-index: 1000;
+
+                display: flex;
+                flex-direction: column;
+
+                width: 100%;
+                height: auto;
+                min-height: 74px;
+                padding: 14px 16px;
+
+                background: rgba(22, 22, 24, 0.98);
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+
+            .profile-section {
+                padding: 0 60px 0 0;
+                margin: 0;
+                border: none;
+            }
+
+            .profile-section h2 {
+                font-size: 19px;
+                margin: 0 0 4px;
+            }
+
+            .profile-section p {
+                font-size: 12px;
+            }
+
+            /* Hamburger menu */
+
+            .admin-mobile-toggle {
+                display: flex;
+                position: absolute;
+
+                top: 15px;
+                right: 16px;
+
+                align-items: center;
+                justify-content: center;
+
+                width: 44px;
+                height: 44px;
+
+                padding: 0;
+                margin: 0;
+
+                background: #29292b;
+                color: var(--accent-color);
+
+                border: 1px solid var(--border-color);
+                border-radius: 10px;
+
+                font-size: 23px;
+                line-height: 1;
+                cursor: pointer;
+                z-index: 1002;
+            }
+
+            /* Hide navigation until menu is opened */
+
+            .sidebar .nav-menu,
+            .sidebar .admin-actions,
+            .sidebar .btn-logout {
+                display: none;
+            }
+
+            /* Open navigation */
+
+            .sidebar.mobile-open .nav-menu {
+                display: flex;
+                flex-direction: column;
+                flex-wrap: nowrap;
+
+                width: 100%;
+                gap: 5px;
+
+                margin-top: 20px;
+                padding-top: 15px;
+
+                border-top: 1px solid var(--border-color);
+            }
+
+            .sidebar.mobile-open .nav-menu li {
+                width: 100%;
+                list-style: none;
+            }
+
+            .sidebar .nav-item {
+                display: flex;
+                align-items: center;
+
+                width: 100%;
+                min-height: 45px;
+
+                padding: 12px 14px;
+                margin-bottom: 5px;
+
+                font-size: 15px;
+                border-radius: 10px;
+                text-align: left;
+            }
+
+            .sidebar.mobile-open .admin-actions {
+                display: block;
+
+                width: 100%;
+                margin: 10px 0;
+                padding: 14px 0 0;
+
+                border-top: 1px solid var(--border-color);
+            }
+
+            /* Logout belongs at bottom of menu */
+
+            .sidebar.mobile-open .btn-logout {
+                display: block;
+
+                width: 100%;
+                min-height: 45px;
+
+                margin-top: 12px;
+                padding: 12px;
+
+                text-align: center;
+                border-radius: 10px;
+            }
+
+            /* Dashboard content */
+
+            .main-content {
+                width: 100%;
+                min-width: 0;
+                height: auto;
+
+                padding: 24px 16px 40px;
+
+                overflow: visible;
+            }
+
+            .tab-content {
+                width: 100%;
+                min-width: 0;
+                max-width: 100%;
+            }
+
+            h3 {
+                font-size: 23px;
+                line-height: 1.35;
+            }
+
+            /* Statistics cards */
+
+            .overview-grid {
+                display: grid;
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+
+                gap: 12px;
+                margin-bottom: 20px;
+            }
+
+            .metric-card {
+                min-width: 0;
+                padding: 22px 12px;
+                border-radius: 14px;
+            }
+
+            .metric-card h2 {
+                font-size: 30px;
+            }
+
+            .metric-card p {
+                font-size: 11px;
+                letter-spacing: 0.3px;
+                line-height: 1.5;
+            }
+
+            /* Upcoming events and activity */
+
+            .overview-split {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr);
+                gap: 16px;
+            }
+
+            .info-card {
+                width: 100%;
+                min-width: 0;
+
+                padding: 22px 16px;
+                border-radius: 16px;
+            }
+
+            .info-card h4 {
+                font-size: 17px;
+            }
+
+            .event-item {
+                overflow-wrap: anywhere;
+            }
+
+            /* Scroll large tables horizontally */
+
+            .table-wrap {
+                width: 100%;
+                max-width: 100%;
+
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .table-wrap table {
+                min-width: 620px;
+            }
+
+            th,
+            td {
+                padding: 12px;
+                font-size: 13px;
+            }
+
+            /* QR code popup */
+
+            #fullImg {
+                max-width: 90vw;
+                max-height: 75dvh;
+                object-fit: contain;
+            }
+        }
+
+        /* Small phones */
+
+        @media (max-width: 360px) {
+            .overview-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .main-content {
+                padding: 20px 12px 32px;
+            }
+        }
+
+        /* Desktop remains unchanged */
+
+        @media (min-width: 769px) {
+            .admin-mobile-toggle {
+                display: none;
+            }
+        }
+    `;
+
+    // Add responsive CSS inside the document head.
+    const style = document.createElement('style');
+    style.textContent = mobileCSS;
+    document.head.appendChild(style);
+
+    // Find the original admin navigation.
+    const sidebar = document.querySelector('.sidebar');
+
+    if (!sidebar) {
+        return;
+    }
+
+    // Create a mobile hamburger button.
+    const toggle = document.createElement('button');
+
+    toggle.type = 'button';
+    toggle.className = 'admin-mobile-toggle';
+    toggle.textContent = '☰';
+
+    toggle.setAttribute('aria-label', 'Open admin menu');
+    toggle.setAttribute('aria-expanded', 'false');
+
+    sidebar.appendChild(toggle);
+
+    // Close mobile navigation.
+    function closeMobileMenu() {
+        sidebar.classList.remove('mobile-open');
+
+        toggle.textContent = '☰';
+
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.setAttribute('aria-label', 'Open admin menu');
+    }
+
+    // Open and close hamburger navigation.
+    toggle.addEventListener('click', function () {
+        const opened = sidebar.classList.toggle('mobile-open');
+
+        toggle.textContent = opened ? '✕' : '☰';
+
+        toggle.setAttribute(
+            'aria-expanded',
+            String(opened)
+        );
+
+        toggle.setAttribute(
+            'aria-label',
+            opened ? 'Close admin menu' : 'Open admin menu'
+        );
+    });
+
+    // Close menu when admin selects a dashboard section.
+    sidebar.querySelectorAll('[data-tab]').forEach(function (button) {
+        button.addEventListener('click', closeMobileMenu);
+    });
+
+    // Close menu with Escape.
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            closeMobileMenu();
+        }
+    });
+
+    // Reset menu when moving back to desktop.
+    window.addEventListener('resize', function () {
+        if (window.innerWidth > 768) {
+            closeMobileMenu();
+        }
+    });
+
+})();
+</script>
+
+<!-- EVENT-PRO MOBILE ADMIN TABLE CARDS -->
+
+<style>
+@media (max-width: 768px) {
+
+    /* Prevent sideways page overflow */
+
+    .main-content,
+    .tab-content,
+    .table-wrap {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .table-wrap {
+        overflow: visible;
+    }
+
+    /* Convert wide tables into mobile cards */
+
+    #seminars table,
+    #participants table,
+    #reports table,
+    #accounts table {
+        display: block;
+        width: 100%;
+        min-width: 0 !important;
+        margin: 0;
+        background: transparent;
+        border: none;
+        border-radius: 0;
+        overflow: visible;
+    }
+
+    #seminars thead,
+    #participants thead,
+    #reports thead,
+    #accounts thead {
+        display: none;
+    }
+
+    #seminars tbody,
+    #participants tbody,
+    #reports tbody,
+    #accounts tbody {
+        display: block;
+        width: 100%;
+    }
+
+    /* Each database row becomes its own card */
+
+    #seminars tbody tr,
+    #participants tbody tr,
+    #reports tbody tr,
+    #accounts tbody tr {
+        display: block;
+        width: 100%;
+        min-width: 0;
+        margin-bottom: 16px;
+        padding: 10px 17px;
+        background: #242426;
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        overflow: hidden;
+    }
+
+    #seminars tbody tr:hover,
+    #participants tbody tr:hover,
+    #reports tbody tr:hover,
+    #accounts tbody tr:hover {
+        background: #29292b;
+    }
+
+    /* Stack the data inside each card */
+
+    #seminars tbody td,
+    #participants tbody td,
+    #reports tbody td,
+    #accounts tbody td {
+        display: block;
+        width: 100%;
+        min-width: 0;
+        padding: 13px 0;
+        border-bottom: 1px solid var(--border-color);
+        overflow-wrap: anywhere;
+        word-break: normal;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    #seminars tbody td:last-child,
+    #participants tbody td:last-child,
+    #reports tbody td:last-child,
+    #accounts tbody td:last-child {
+        border-bottom: none;
+    }
+
+    /* Add the column name above each value */
+
+    #seminars tbody td::before,
+    #participants tbody td::before,
+    #reports tbody td::before,
+    #accounts tbody td::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 8px;
+        color: var(--text-muted);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: .6px;
+        text-transform: uppercase;
+    }
+
+    /* Make the first field stand out */
+
+    #seminars tbody td:first-child,
+    #participants tbody td:first-child,
+    #reports tbody td:first-child,
+    #accounts tbody td:first-child {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text-main);
+    }
+
+    /* Keep status badges neat */
+
+    #seminars .badge,
+    #participants .badge,
+    #accounts .badge {
+        display: inline-block;
+        padding: 7px 13px;
+        border-radius: 20px;
+        font-size: 12px;
+    }
+
+    /* Show the participant QR clearly */
+
+    #participants .qr-thumb {
+        width: 85px;
+        height: 85px;
+        padding: 4px;
+        object-fit: contain;
+        background: white;
+        border-radius: 10px;
+    }
+
+    /* Make admin actions easy to tap */
+
+    #seminars .inline-form,
+    #participants .inline-form,
+    #accounts .inline-form {
+        display: inline-block;
+        max-width: 100%;
+        margin: 5px 8px 5px 0;
+        vertical-align: middle;
+    }
+
+    #seminars .inline-form button,
+    #participants .inline-form button,
+    #accounts .inline-form button {
+        min-height: 43px;
+        padding: 10px 13px;
+        border-radius: 9px;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.3;
+        cursor: pointer;
+    }
+
+    #seminars .inline-form .text-action,
+    #accounts .inline-form .text-action {
+        background: var(--accent-color);
+        color: #000;
+    }
+
+    #seminars .inline-form .text-delete,
+    #participants .inline-form .text-delete,
+    #accounts .inline-form .text-delete {
+        background: rgba(255, 69, 58, .1);
+        border: 1px solid rgba(255, 69, 58, .35);
+        color: var(--danger-color);
+    }
+
+    /* Report printing button */
+
+    #reports .text-action {
+        display: inline-block;
+        min-height: 44px;
+        padding: 13px 16px !important;
+        text-align: center;
+        font-size: 14px;
+    }
+
+    /* Empty database messages */
+
+    #seminars .mobile-empty-row,
+    #participants .mobile-empty-row,
+    #reports .mobile-empty-row,
+    #accounts .mobile-empty-row {
+        padding: 10px 15px;
+    }
+
+    #seminars .mobile-empty-row td,
+    #participants .mobile-empty-row td,
+    #reports .mobile-empty-row td,
+    #accounts .mobile-empty-row td {
+        padding: 24px 5px;
+        text-align: center !important;
+        color: var(--text-muted);
+        font-weight: 400;
+    }
+
+    #seminars .mobile-empty-row td::before,
+    #participants .mobile-empty-row td::before,
+    #reports .mobile-empty-row td::before,
+    #accounts .mobile-empty-row td::before {
+        display: none;
+    }
+
+    /* Long headings fit smaller phones */
+
+    #seminars h3,
+    #participants h3,
+    #reports h3,
+    #accounts h3 {
+        font-size: clamp(21px, 6vw, 25px);
+        overflow-wrap: anywhere;
+    }
+}
+</style>
+
+<script>
+/*
+ * Add labels to the existing table cells.
+ * No PHP queries or admin actions are changed.
+ */
+
+(function () {
+
+    function setupAdminMobileCards() {
+
+        const selectors = [
+            '#seminars table',
+            '#participants table',
+            '#reports table',
+            '#accounts table'
+        ];
+
+        selectors.forEach(function (selector) {
+
+            const table = document.querySelector(selector);
+
+            if (!table) {
+                return;
+            }
+
+            const headings = Array.from(
+                table.querySelectorAll('thead th')
+            ).map(function (heading) {
+                return heading.textContent.trim();
+            });
+
+            table.querySelectorAll('tbody tr').forEach(
+                function (row) {
+
+                    const cells = row.querySelectorAll('td');
+
+                    /* Handle empty database messages */
+
+                    if (
+                        cells.length === 1 &&
+                        cells[0].hasAttribute('colspan')
+                    ) {
+                        row.classList.add('mobile-empty-row');
+                        return;
+                    }
+
+                    /* Give each cell its matching column label */
+
+                    cells.forEach(function (cell, index) {
+
+                        cell.setAttribute(
+                            'data-label',
+                            headings[index] || ''
+                        );
+
+                    });
+                }
+            );
+        });
+    }
+
+    if (document.readyState === 'loading') {
+
+        document.addEventListener(
+            'DOMContentLoaded',
+            setupAdminMobileCards
+        );
+
+    } else {
+
+        setupAdminMobileCards();
+
+    }
+
+})();
 </script>
 
 </body>
