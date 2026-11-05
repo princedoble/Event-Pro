@@ -4,16 +4,26 @@
 **From Code to Cloud – Technical Elective III**  
 **BSCPE 4B**
 
+**Live Website:** https://event-pro.free.nf/  
+**GitHub Repository:** https://github.com/princedoble/Event-Pro  
+**Hosting Provider:** InfinityFree
+
+---
+
 ## 1. Project Overview
 
 Event-Pro is a web-based seminar registration and attendance management system developed to simplify the process of organizing seminars, registering participants, monitoring attendance, and generating participation certificates.
 
 The system has two types of users:
 
-- **Administrator** – Manages seminars, monitors participants, scans QR codes, and generates attendance reports.
-- **Participant** – Creates an account, registers for seminars, receives QR tickets, and accesses participation certificates.
+- **Administrator** – Manages seminars, monitors participants, scans QR codes, manages user accounts, and generates attendance reports.
+- **Participant** – Creates an account, registers for seminars, receives QR tickets, views registration history, and accesses participation certificates.
 
 Instead of using paper registration forms and manually recording attendance, Event-Pro uses online registration and QR code scanning to make the process more organized and efficient.
+
+The system is deployed online through InfinityFree and can be accessed using compatible desktop and mobile browsers.
+
+---
 
 ## 2. How to Use Event-Pro
 
@@ -21,7 +31,7 @@ Instead of using paper registration forms and manually recording attendance, Eve
 
 **Step 1: Create an Account**
 
-1. Open the Event-Pro website.
+1. Open the Event-Pro website: https://event-pro.free.nf/
 2. Click the registration option.
 3. Enter the required account information.
 4. Submit the registration form.
@@ -67,7 +77,7 @@ A successfully verified QR code allows the administrator to confirm the particip
 1. After attending the seminar, wait for the administrator to end the event.
 2. Log in to your Event-Pro account.
 3. Open the User Dashboard.
-4. Find the completed seminar in your event history or registration records.
+4. Find the completed seminar in your event history.
 5. If you have a verified attendance record, access your participation certificate.
 6. View or print the certificate.
 
@@ -109,14 +119,17 @@ This helps the administrator manage participant capacity and monitor seminar act
 **Step 4: Scan Participant QR Codes**
 
 1. Open the QR Scanner from the administrator interface.
-2. Allow the browser to access your camera.
-3. Ask the participant to present their QR ticket.
-4. Position the QR code in front of the camera.
-5. Wait for Event-Pro to verify the QR code.
+2. Select the correct seminar.
+3. Choose **Live Camera** or **Upload Image**.
+4. For live scanning, allow the browser to access your camera.
+5. Ask the participant to present their QR ticket, or upload its original image.
+6. Wait for Event-Pro to detect and verify the QR code.
 
 The system uses the unique QR token to identify the participant and process attendance verification.
 
 The verification process helps prevent invalid QR codes and duplicate attendance recording.
+
+For mobile camera scanning, use the HTTPS version of the website and grant camera permission.
 
 **Step 5: Monitor Attendance**
 
@@ -134,6 +147,8 @@ The verification process helps prevent invalid QR codes and duplicate attendance
 
 Ending a seminar changes its status and allows eligible participants to access their participation certificates.
 
+Seminars can also be finalized automatically after their configured end date when the administrator opens the dashboard.
+
 **Step 7: Generate Attendance Reports**
 
 1. Open the administrator's reporting function.
@@ -142,6 +157,15 @@ Ending a seminar changes its status and allows eligible participants to access t
 4. Print the report when needed.
 
 Reports help organizers document seminar participation and attendance.
+
+**Step 8: Manage User Accounts**
+
+1. Open **Account Access** in the Admin Dashboard.
+2. Review account statuses and failed login attempts.
+3. Unlock an account when appropriate.
+4. Delete user accounts when necessary.
+
+---
 
 ## 3. Example of the Complete System Workflow
 
@@ -161,6 +185,8 @@ Here is a typical example of how Event-Pro is used:
 
 This process demonstrates how Event-Pro connects seminar management, registration, QR verification, attendance monitoring, and certificates in one web-based system.
 
+---
+
 ## 4. Main System Features
 
 | Feature | Description |
@@ -169,29 +195,71 @@ This process demonstrates how Event-Pro connects seminar management, registratio
 | Admin Dashboard | Provides seminar management and monitoring functions |
 | Seminar Creation | Allows administrators to create seminars and configure schedules |
 | Seminar Registration | Allows participants to register for available events |
-| QR Code Generation | Generates a unique QR ticket for each registration |
+| QR Code Generation | Generates a unique, secure QR ticket for each registration |
 | QR Code Verification | Verifies QR tickets during attendance scanning |
+| Live Camera Scanning | Detects QR tickets using a supported device camera |
+| QR Image Upload | Allows administrators to scan QR codes from uploaded images |
 | Attendance Monitoring | Stores and displays attendance records |
-| Event Ending | Allows administrators to mark seminars as completed |
+| Event Ending | Allows administrators to finalize seminars |
 | Participation Certificates | Provides certificates to eligible participants |
-| Attendance Reports | Allows administrators to view and print attendance records |
+| Attendance Reports | Allows administrators to view and print attendance reports |
+| Account Management | Allows administrators to manage locked and existing accounts |
+| Responsive Design | Provides mobile-friendly layouts for users and administrators |
 
-## 5. Technologies Used
+---
+
+## 5. CRUD Functionality
+
+Event-Pro implements the four fundamental database operations: **Create, Read, Update, and Delete (CRUD)**.
+
+CRUD operations allow the system to dynamically manage seminars, participant registrations, user accounts, and attendance information stored in the MySQL database.
+
+| CRUD Operation | SQL Command | Implementation in Event-Pro |
+|---|---|---|
+| **Create** | `INSERT` | Creates user accounts, seminar records, participant registrations, and attendance records |
+| **Read** | `SELECT` | Retrieves seminars, participants, user information, registration history, attendance records, and reports |
+| **Update** | `UPDATE` | Updates participant attendance status, finalizes seminars, and unlocks deactivated user accounts |
+| **Delete** | `DELETE` | Deletes seminar records, removes participants, and deletes user accounts |
+
+### Create
+
+The system allows users to register accounts and register for seminars. Administrators can also create new seminar records.
+
+### Read
+
+Event-Pro retrieves records from the database to display information on the User Dashboard and Admin Dashboard, including seminar schedules, participant registrations, event history, and attendance reports.
+
+### Update
+
+The system updates participant statuses after successful QR verification, changes seminar statuses when events end, and allows administrators to reactivate locked user accounts.
+
+### Delete
+
+Administrators can delete seminars, remove registered participants, and delete user accounts. Related seminar and attendance records are handled by the system's database operations.
+
+**Note:** Event-Pro demonstrates all four CRUD operations across its database entities. It does not currently include a general Edit Seminar form; its Update functionality is implemented through status and account-management operations.
+
+---
+
+## 6. Technologies Used
 
 | Technology | Purpose |
 |---|---|
 | HTML | Website structure |
-| CSS | Website design and layout |
-| JavaScript | Interactive functions and QR scanning |
+| CSS | Website design and responsive layouts |
+| JavaScript | Interactive functions, mobile navigation, and QR scanning |
 | PHP | Server-side application logic |
 | MySQL / MariaDB | Database storage |
-| XAMPP | Local development environment |
-| html5-qrcode | Camera-based QR code scanner |
+| XAMPP | Local development and testing environment |
+| html5-qrcode | Camera-based and image-based QR code scanning |
 | PHP QR Code | QR code image generation |
-| Git and GitHub | Version control and source code repository |
-| InfinityFree | Planned live website hosting |
+| Git | Local version control and branch management |
+| GitHub | Source code repository and development history |
+| InfinityFree | Live PHP and MySQL website hosting |
 
-## 6. How to Install and Run Event-Pro Locally
+---
+
+## 7. How to Install and Run Event-Pro Locally
 
 **Step 1: Install XAMPP**
 
@@ -206,7 +274,7 @@ Start the following services:
 
 Clone or download the repository:
 
-https://github.com/princedoble/From-Code-to-Cloud
+https://github.com/princedoble/Event-Pro
 
 Place the project folder inside:
 
@@ -231,6 +299,10 @@ Open:
 
 Update the database connection settings to match your local MySQL configuration.
 
+For a typical local XAMPP setup, the connection uses `localhost` as the host, `root` as the username, and the local database name `event_pro`.
+
+Use the credentials configured in your own XAMPP installation.
+
 **Step 5: Set Up an Administrator Account**
 
 The shared SQL file does not contain administrator credentials or personal user data.
@@ -238,6 +310,8 @@ The shared SQL file does not contain administrator credentials or personal user 
 A new installation requires the system owner to create the initial administrator account securely, using a password hash generated by PHP's `password_hash()` function.
 
 The account must use the `admin` role.
+
+Do not publish administrator passwords, password hashes, or private hosting credentials in the GitHub repository.
 
 **Step 6: Open Event-Pro**
 
@@ -247,7 +321,9 @@ In your browser, visit:
 
 The system can now be used for participant registration and seminar management after the required account setup is complete.
 
-## 7. Database Structure
+---
+
+## 8. Database Structure
 
 Event-Pro uses the `event_pro` database containing four main tables:
 
@@ -258,45 +334,141 @@ Event-Pro uses the `event_pro` database containing four main tables:
 | `participants` | Stores seminar registrations, participant information, and QR tokens |
 | `attendance` | Stores participant attendance records and check-in timestamps |
 
-The system uses unique QR tokens for verifying participant registrations.
+The system uses unique secure QR tokens to verify participant registrations.
 
-## 8. Online Deployment
+---
+
+## 9. Online Deployment
 
 **Hosting Provider:** InfinityFree  
-**Live Website:** To be added after deployment.
+**Live Website:** https://event-pro.free.nf/  
+**Source Code:** https://github.com/princedoble/Event-Pro
 
-For online deployment:
+Event-Pro has been deployed online using InfinityFree's PHP hosting and MySQL database services.
 
-1. Create an InfinityFree hosting account.
-2. Create a MySQL database through the hosting control panel.
-3. Upload the Event-Pro project files to the website's `htdocs` directory.
-4. Import `event_pro.sql` into the hosting database.
-5. Update `config/db.php` using the hosting provider's database hostname and credentials.
-6. Securely create the initial administrator account.
-7. Configure the website's homepage and enable HTTPS.
-8. Test login, seminar registration, QR code generation, QR scanning, attendance verification, and certificates.
-9. Add the final live website URL to this README.
+### Deployment Process
 
-The live website should use HTTPS to allow supported mobile browsers to request camera access for QR scanning.
+1. Create an InfinityFree hosting account and select a domain.
+2. Create a MySQL database through the InfinityFree hosting control panel.
+3. Upload the Event-Pro project files into the website's `htdocs` directory.
+4. Preserve the original project folder structure, including `pages`, `config`, `assets`, `libs`, and `qrcodes`.
+5. Import `event_pro.sql` into the hosted MySQL database using phpMyAdmin.
+6. Update `config/db.php` using the correct hosting database hostname, username, password, and database name.
+7. Securely create the initial administrator account.
+8. Configure `index.php` to open or redirect to the Event-Pro homepage.
+9. Access the website through HTTPS.
+10. Test login, registration, seminar creation, QR code generation, QR scanning, attendance verification, and certificates.
 
-## 9. Using Event-Pro on Mobile Devices
+The website uses HTTPS so supported mobile browsers can request camera access for QR scanning.
 
-Event-Pro is designed as a browser-based application, so participants and administrators can access it from supported mobile browsers.
+**Security Reminder:** Database passwords, private account credentials, and QR token information should not be publicly shared or committed to GitHub.
 
-Participants can use a phone to register for seminars and display their QR tickets.
+---
 
-Administrators can use a phone's camera to scan QR tickets, provided that the website uses HTTPS and camera permission is granted.
+## 10. Using Event-Pro on Mobile Devices
 
-Mobile layout, camera scanning, and certificate printing should be tested after deployment to confirm compatibility.
+Event-Pro is designed as a browser-based application accessible through supported desktop and mobile browsers.
 
-## 10. Project Purpose
+The system includes responsive improvements for smaller screens.
 
-Event-Pro was developed to demonstrate the use of frontend development, backend programming, database management, QR code technology, and web deployment in a functional seminar management application.
+### Mobile Features
+
+- Responsive homepage layout
+- Mobile-friendly registration and login forms
+- Collapsible navigation menus in the User and Admin Dashboards
+- Mobile-friendly overview statistics and dashboard cards
+- Improved display of seminar registrations and event history
+- Responsive administrative record views
+- Touch-friendly buttons and navigation
+- QR scanning through supported mobile browsers
+
+Participants can use a phone to register for seminars, view event history, and display their QR tickets.
+
+Administrators can use a phone's camera to scan QR tickets when the website is accessed over HTTPS and camera access is granted.
+
+The scanner also supports QR detection from uploaded image files.
+
+---
+
+## 11. GitHub Branching and Version Control
+
+Event-Pro uses Git and GitHub to track source-code changes, organize feature development, and maintain the project's main version.
+
+### Main Branch — `main`
+
+The `main` branch serves as the primary branch of Event-Pro.
+
+It contains the application's core features, PHP backend, database integration, QR attendance functionality, and completed responsive improvements.
+
+### Mobile Feature Branch — `feature/mobile-responsive`
+
+A dedicated branch named `feature/mobile-responsive` was used to organize the mobile-responsiveness improvements.
+
+**Purpose of the branch:**
+
+- Develop mobile improvements separately from the main project branch.
+- Improve the website's appearance on smartphones and tablets.
+- Add mobile-friendly navigation for participant and administrator dashboards.
+- Improve registration, login, and dashboard layouts.
+- Make wide data tables easier to read on smaller screens.
+- Preserve the system's existing PHP and database functionality while improving its interface.
+
+Separating the responsive changes into a feature branch helped organize development and maintain a clear Git history.
+
+### Feature Branch Integration
+
+After the mobile improvements were developed and committed, `feature/mobile-responsive` was merged into `main`.
+
+The integration used a **fast-forward merge**, meaning Git moved the `main` branch forward to the feature branch's latest commit without creating a separate merge commit.
+
+The mobile-responsive development commit was:
+
+`6fd3d6d` — **Make Event-Pro responsive across mobile devices**
+
+### QR Scanner Bug Fix
+
+After the responsive changes, the QR scanner was updated to improve QR detection and image-upload scanning.
+
+The fix addressed scanner configuration and improved handling of live-camera and uploaded-image QR detection.
+
+The existing QR verification and attendance-recording functionality was preserved.
+
+### Development Workflow
+
+1. Create the initial project repository.
+2. Develop and commit the core seminar management functionality.
+3. Implement QR registration and secure verification.
+4. Add QR ticket viewing and participation certificates.
+5. Document the project in the README.
+6. Create and work on the `feature/mobile-responsive` branch.
+7. Test and commit responsive improvements.
+8. Merge the feature branch into `main`.
+9. Fix and test QR scanner detection.
+10. Deploy the application to InfinityFree.
+11. Update documentation with the live website and development details.
+
+This process demonstrates meaningful commits, feature branching, integration into the main branch, and live application deployment.
+
+---
+
+## 12. Project Purpose
+
+Event-Pro was developed to demonstrate the use of frontend development, backend programming, database management, CRUD operations, QR code technology, responsive design, Git version control, and web deployment in a functional seminar management application.
 
 The project aims to reduce manual registration work, improve attendance recording, and provide an organized way to manage seminar participants and their certificates.
 
-## 11. GitHub Repository
+---
 
-**Source Code:** https://github.com/princedoble/From-Code-to-Cloud
+## 13. GitHub Repository and Live Website
 
-The repository contains the system's source code, database structure, and project documentation.
+**GitHub Repository:** https://github.com/princedoble/Event-Pro
+
+**Live Website:** https://event-pro.free.nf/
+
+The repository contains the system's source code, database structure, development history, and project documentation.
+
+The live website demonstrates Event-Pro running on an online PHP and MySQL hosting environment.
+
+---
+
+**Event-Pro — From Code to Cloud | Technical Elective III | BSCPE 4B**
